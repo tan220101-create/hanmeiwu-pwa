@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="scroll-smooth">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4WH9ZV1ZQY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-4WH9ZV1ZQY');
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>韓味屋 | 正宗韓式料理首選</title>
+    <meta name="description" content="韓味屋 HAN MEI WU － 正宗首爾風味，線上點餐、線上訂位。">
+
+    <!-- ===== PWA ===== -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#E53E3E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="韓味屋">
+    <!-- iOS Safari -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="韓味屋">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        koreanRed: '#E53E3E',
+                        koreanDark: '#1A202C',
+                        koreanGold: '#D69E2E',
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* ---- RWD / PWA 基礎 ---- */
+        html { -webkit-text-size-adjust: 100%; scroll-padding-top: 5rem; }
+        body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+        button, a { touch-action: manipulation; }
+        /* 安全區域（瀏海 / 手勢列） */
+        .safe-top    { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .safe-x      { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+        /* 已安裝成 App 時隱藏安裝按鈕 */
+        @media (display-mode: standalone) { .hide-in-app { display: none !important; } }
+
+        /* ---- 離線友善的食物圖（emoji + 漸層，無需網路） ---- */
+        .food-img {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, var(--c1, #fecaca), var(--c2, #fde68a));
+            user-select: none;
+        }
+        .food-img span { font-size: var(--fs, 4.5rem); filter: drop-shadow(0 6px 8px rgba(0,0,0,.18)); transition: transform .5s; }
+        .group:hover .food-img span { transform: scale(1.12) rotate(-4deg); }
+
+        /* Hero 背景 */
+        #hero-bg {
+            background:
+                radial-gradient(circle at 80% 20%, rgba(229,62,62,.45), transparent 45%),
+                radial-gradient(circle at 15% 85%, rgba(214,158,46,.35), transparent 40%);
+        }
+        .hero-emoji { position: absolute; font-size: clamp(3rem, 9vw, 7rem); opacity: .18; filter: blur(.5px); pointer-events: none; }
+
+        /* 購物車抽屜動畫 */
+        #cart-panel { transform: translateX(100%); transition: transform .3s ease; }
+        #cart-drawer.open #cart-panel { transform: translateX(0); }
+        #cart-overlay { opacity: 0; transition: opacity .3s ease; }
+        #cart-drawer.open #cart-overlay { opacity: 1; }
+
+        /* Toast */
+        .toast { animation: toast-in .3s ease; }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+            html { scroll-behavior: auto; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+    <!-- 離線提示列 -->
+    <div id="offline-bar" class="hidden fixed top-0 inset-x-0 z-[60] bg-amber-500 text-gray-900 text-xs sm:text-sm font-bold text-center py-1.5 safe-top">
+        <i class="fa-solid fa-wifi-slash mr-1"></i> 目前處於離線模式，部分功能（如字型更新）可能受限
+    </div>
+
+    <!-- 導覽列 (Navbar) -->
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm safe-top safe-x" id="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16 sm:h-20">
+                <!-- Logo -->
+                <a href="#home" class="flex items-center space-x-2 min-w-0">
+                    <div class="bg-koreanRed text-white p-2 sm:p-2.5 rounded-xl shadow-md flex-shrink-0">
+                        <i class="fa-solid fa-bowl-food text-lg sm:text-xl"></i>
+                    </div>
+                    <span class="text-xl sm:text-2xl font-black tracking-wider text-koreanDark truncate">韓味屋 <span class="hidden sm:inline text-koreanRed text-sm font-medium">HAN MEI WU</span></span>
+                </a>
+
+                <!-- 桌面版導覽連結 -->
+                <div class="hidden md:flex items-center space-x-6 lg:space-x-8 font-medium">
+                    <a href="#home" class="hover:text-koreanRed transition-colors">首頁</a>
+                    <a href="#specialties" class="hover:text-koreanRed transition-colors">招牌推薦</a>
+                    <a href="#menu" class="hover:text-koreanRed transition-colors">精選菜單</a>
+                    <a href="#about" class="hover:text-koreanRed transition-colors">關於我們</a>
+                    <a href="#reservation" class="hover:text-koreanRed transition-colors">線上訂位</a>
+                </div>
+
+                <!-- 右側按鈕區 -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <!-- 安裝 App 按鈕（支援時才顯示） -->
+                    <button id="install-btn" onclick="installApp()" class="hidden hide-in-app items-center px-3 py-2 text-xs sm:text-sm font-bold text-white bg-koreanRed hover:bg-red-700 rounded-full shadow transition-colors">
+                        <i class="fa-solid fa-download mr-1.5"></i><span class="hidden sm:inline">安裝</span> App
+                    </button>
+
+                    <!-- 購物車按鈕 -->
+                    <button onclick="toggleCart()" aria-label="開啟點餐清單" class="relative w-11 h-11 flex items-center justify-center text-gray-700 hover:text-koreanRed transition-colors bg-gray-100 hover:bg-red-50 rounded-full">
+                        <i class="fa-solid fa-cart-shopping text-lg"></i>
+                        <span id="cart-badge" class="absolute -top-1 -right-1 bg-koreanRed text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold hidden">0</span>
+                    </button>
+
+                    <!-- 手機版選單按鈕 -->
+                    <button onclick="toggleMobileMenu()" aria-label="開啟選單" class="md:hidden w-11 h-11 flex items-center justify-center text-gray-700 hover:text-koreanRed focus:outline-none">
+                        <i class="fa-solid fa-bars text-xl" id="mobile-menu-icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 手機版下拉選單 -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-100 px-4 pt-2 pb-6 space-y-1 shadow-lg">
+            <a href="#home" onclick="toggleMobileMenu()" class="block py-3 text-gray-700 hover:text-koreanRed font-medium">首頁</a>
+            <a href="#specialties" onclick="toggleMobileMenu()" class="block py-3 text-gray-700 hover:text-koreanRed font-medium">招牌推薦</a>
+            <a href="#menu" onclick="toggleMobileMenu()" class="block py-3 text-gray-700 hover:text-koreanRed font-medium">精選菜單</a>
+            <a href="#about" onclick="toggleMobileMenu()" class="block py-3 text-gray-700 hover:text-koreanRed font-medium">關於我們</a>
+            <a href="#reservation" onclick="toggleMobileMenu()" class="block py-3 text-gray-700 hover:text-koreanRed font-medium">線上訂位</a>
+        </div>
+    </nav>
+
+    <!-- 主視覺 (Hero Section) -->
+    <header id="home" class="relative pt-20 min-h-[100svh] flex items-center bg-gradient-to-r from-gray-900 to-gray-800 text-white overflow-hidden safe-x">
+        <div id="hero-bg" class="absolute inset-0"></div>
+        <span class="hero-emoji" style="top:14%; right:8%;">🥩</span>
+        <span class="hero-emoji" style="bottom:12%; right:22%;">🍲</span>
+        <span class="hero-emoji" style="top:48%; right:3%;">🍗</span>
+        <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
+
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32 w-full">
+            <div class="max-w-2xl space-y-5 sm:space-y-6">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-koreanRed/20 text-red-300 border border-koreanRed/40 backdrop-blur-sm">
+                    <i class="fa-solid fa-fire mr-1.5"></i> 正宗首爾風味・手工韓式小菜
+                </span>
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight">
+                    品味最道地的<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-koreanRed to-koreanGold">韓國國民美食</span>
+                </h1>
+                <p class="text-base sm:text-lg text-gray-300 font-light leading-relaxed">
+                    嚴選頂級五花肉、獨家秘製辣醬與直送食材，為您重現韓國街頭與傳統宮廷的經典美味。每一口都是極致的味蕾享受。
+                </p>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-2 sm:pt-4">
+                    <a href="#menu" class="inline-flex justify-center items-center px-8 py-4 bg-koreanRed hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition-all">
+                        立即點餐 <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </a>
+                    <a href="#reservation" class="inline-flex justify-center items-center px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl backdrop-blur-md border border-white/20 transition-all">
+                        預約訂位
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 招牌推薦 (Specialties) -->
+    <section id="specialties" class="py-16 sm:py-20 bg-white safe-x">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+                <span class="text-koreanRed font-bold text-sm tracking-widest uppercase">Signature Dishes</span>
+                <h2 class="text-3xl sm:text-4xl font-black text-gray-900 mt-2">人氣必點招牌</h2>
+                <div class="w-16 h-1 bg-koreanRed mx-auto mt-4 rounded-full"></div>
+                <p class="text-gray-600 mt-4">饕客一致推薦，來店絕不能錯過的經典美味。</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                <!-- 卡片 1 -->
+                <div class="bg-gray-50 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+                    <div class="relative h-52 sm:h-60 lg:h-64 overflow-hidden">
+                        <div class="food-img" style="--c1:#fecaca; --c2:#fdba74; --fs:6rem;" role="img" aria-label="韓式厚切五花肉"><span>🥓</span></div>
+                        <span class="absolute top-4 right-4 bg-koreanRed text-white text-xs px-3 py-1 rounded-full font-bold shadow">熱賣第一</span>
+                    </div>
+                    <div class="p-5 sm:p-6 space-y-3">
+                        <div class="flex justify-between items-center gap-2">
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-900">鐵板厚切豬五花</h3>
+                            <span class="text-koreanRed font-black text-lg whitespace-nowrap">NT$ 480</span>
+                        </div>
+                        <p class="text-gray-600 text-sm leading-relaxed">嚴選優質厚切豬五花，外皮焦香、肉汁豐沛，搭配專用沾醬與生菜包食。</p>
+                        <button onclick="addToCart('鐵板厚切豬五花', 480)" class="w-full mt-2 py-3 bg-gray-900 hover:bg-koreanRed text-white font-medium rounded-xl transition-colors flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-plus"></i> <span>加入點餐</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 卡片 2 -->
+                <div class="bg-gray-50 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+                    <div class="relative h-52 sm:h-60 lg:h-64 overflow-hidden">
+                        <div class="food-img" style="--c1:#fed7aa; --c2:#fca5a5; --fs:6rem;" role="img" aria-label="韓式洋釀炸雞"><span>🍗</span></div>
+                        <span class="absolute top-4 right-4 bg-koreanGold text-gray-900 text-xs px-3 py-1 rounded-full font-bold shadow">主廚推薦</span>
+                    </div>
+                    <div class="p-5 sm:p-6 space-y-3">
+                        <div class="flex justify-between items-center gap-2">
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-900">招牌洋釀炸雞</h3>
+                            <span class="text-koreanRed font-black text-lg whitespace-nowrap">NT$ 380</span>
+                        </div>
+                        <p class="text-gray-600 text-sm leading-relaxed">外皮酥脆、肉質鮮嫩，裹上獨家特調酸甜微辣的洋釀醬汁，讓人吮指回味。</p>
+                        <button onclick="addToCart('招牌洋釀炸雞', 380)" class="w-full mt-2 py-3 bg-gray-900 hover:bg-koreanRed text-white font-medium rounded-xl transition-colors flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-plus"></i> <span>加入點餐</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 卡片 3 -->
+                <div class="bg-gray-50 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group sm:col-span-2 lg:col-span-1">
+                    <div class="relative h-52 sm:h-60 lg:h-64 overflow-hidden">
+                        <div class="food-img" style="--c1:#fecdd3; --c2:#fde68a; --fs:6rem;" role="img" aria-label="海鮮泡菜豆腐鍋"><span>🍲</span></div>
+                        <span class="absolute top-4 right-4 bg-gray-800 text-white text-xs px-3 py-1 rounded-full font-bold shadow">暖心熱銷</span>
+                    </div>
+                    <div class="p-5 sm:p-6 space-y-3">
+                        <div class="flex justify-between items-center gap-2">
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-900">海鮮泡菜豆腐鍋</h3>
+                            <span class="text-koreanRed font-black text-lg whitespace-nowrap">NT$ 320</span>
+                        </div>
+                        <p class="text-gray-600 text-sm leading-relaxed">以手工熟成泡菜熬煮，加入鮮蝦、蛤蜊與滑嫩豆腐，湯頭濃郁酸辣開胃。</p>
+                        <button onclick="addToCart('海鮮泡菜豆腐鍋', 320)" class="w-full mt-2 py-3 bg-gray-900 hover:bg-koreanRed text-white font-medium rounded-xl transition-colors flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-plus"></i> <span>加入點餐</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 精選菜單 (Menu Section with Tabs) -->
+    <section id="menu" class="py-16 sm:py-20 bg-gray-100 safe-x">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-10 sm:mb-12">
+                <span class="text-koreanRed font-bold text-sm tracking-widest uppercase">Our Menu</span>
+                <h2 class="text-3xl sm:text-4xl font-black text-gray-900 mt-2">美味全菜單</h2>
+                <div class="w-16 h-1 bg-koreanRed mx-auto mt-4 rounded-full"></div>
+            </div>
+
+            <!-- 分類標籤（手機可橫向捲動） -->
+            <div class="flex sm:flex-wrap sm:justify-center gap-2 mb-10 sm:mb-12 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0" id="menu-tabs">
+                <button onclick="filterMenu(event, 'all')" class="menu-tab-btn flex-shrink-0 px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm bg-koreanRed text-white shadow-md transition-all">全部餐點</button>
+                <button onclick="filterMenu(event, 'bbq')" class="menu-tab-btn flex-shrink-0 px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm bg-white text-gray-700 hover:bg-gray-200 transition-all">韓式烤肉</button>
+                <button onclick="filterMenu(event, 'main')" class="menu-tab-btn flex-shrink-0 px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm bg-white text-gray-700 hover:bg-gray-200 transition-all">主食飯麵</button>
+                <button onclick="filterMenu(event, 'stew')" class="menu-tab-btn flex-shrink-0 px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm bg-white text-gray-700 hover:bg-gray-200 transition-all">湯鍋類</button>
+                <button onclick="filterMenu(event, 'drink')" class="menu-tab-btn flex-shrink-0 px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm bg-white text-gray-700 hover:bg-gray-200 transition-all">飲品酒水</button>
+            </div>
+
+            <!-- 菜單列表 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" id="menu-container">
+
+                <div class="menu-item bg-white p-4 sm:p-5 rounded-2xl shadow-sm flex items-center space-x-4 border border-gray-100 group" data-category="bbq">
+                    <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <div class="food-img" style="--c1:#fecaca; --c2:#fb923c; --fs:2.6rem;" role="img" aria-label="雪花牛小排"><span>🥩</span></div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start gap-2">
+                            <h4 class="font-bold text-gray-900">特級醬醃雪花牛小排</h4>
+                            <span class="text-koreanRed font-black whitespace-nowrap">NT$ 560</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">秘製水果醬汁醃製，肉質軟嫩多汁。</p>
+                        <button onclick="addToCart('特級醬醃雪花牛小排', 560)" class="mt-2 text-xs bg-red-50 text-koreanRed px-3 py-2 rounded-lg font-bold hover:bg-koreanRed hover:text-white transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入點餐
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item bg-white p-4 sm:p-5 rounded-2xl shadow-sm flex items-center space-x-4 border border-gray-100 group" data-category="main">
+                    <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <div class="food-img" style="--c1:#fde68a; --c2:#fdba74; --fs:2.6rem;" role="img" aria-label="石鍋拌飯"><span>🍚</span></div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start gap-2">
+                            <h4 class="font-bold text-gray-900">傳統石鍋拌飯</h4>
+                            <span class="text-koreanRed font-black whitespace-nowrap">NT$ 280</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">豐富時蔬、特製肉燥與靈魂辣醬，鍋巴香脆。</p>
+                        <button onclick="addToCart('傳統石鍋拌飯', 280)" class="mt-2 text-xs bg-red-50 text-koreanRed px-3 py-2 rounded-lg font-bold hover:bg-koreanRed hover:text-white transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入點餐
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item bg-white p-4 sm:p-5 rounded-2xl shadow-sm flex items-center space-x-4 border border-gray-100 group" data-category="main">
+                    <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <div class="food-img" style="--c1:#fecaca; --c2:#fde047; --fs:2.6rem;" role="img" aria-label="起司辣炒年糕"><span>🧀</span></div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start gap-2">
+                            <h4 class="font-bold text-gray-900">濃郁起司辣炒年糕</h4>
+                            <span class="text-koreanRed font-black whitespace-nowrap">NT$ 250</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">Q彈年糕搭配魚餅與濃郁牽絲起司。</p>
+                        <button onclick="addToCart('濃郁起司辣炒年糕', 250)" class="mt-2 text-xs bg-red-50 text-koreanRed px-3 py-2 rounded-lg font-bold hover:bg-koreanRed hover:text-white transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入點餐
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item bg-white p-4 sm:p-5 rounded-2xl shadow-sm flex items-center space-x-4 border border-gray-100 group" data-category="stew">
+                    <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <div class="food-img" style="--c1:#fca5a5; --c2:#fcd34d; --fs:2.6rem;" role="img" aria-label="部隊鍋"><span>🍜</span></div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start gap-2">
+                            <h4 class="font-bold text-gray-900">經典首爾部隊鍋</h4>
+                            <span class="text-koreanRed font-black whitespace-nowrap">NT$ 420</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">午餐肉、起司、泡麵與香腸的澎湃組合。</p>
+                        <button onclick="addToCart('經典首爾部隊鍋', 420)" class="mt-2 text-xs bg-red-50 text-koreanRed px-3 py-2 rounded-lg font-bold hover:bg-koreanRed hover:text-white transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入點餐
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item bg-white p-4 sm:p-5 rounded-2xl shadow-sm flex items-center space-x-4 border border-gray-100 group" data-category="drink">
+                    <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <div class="food-img" style="--c1:#bbf7d0; --c2:#6ee7b7; --fs:2.6rem;" role="img" aria-label="韓國燒酒"><span>🍶</span></div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start gap-2">
+                            <h4 class="font-bold text-gray-900">真露韓式燒酒 (原味/水果)</h4>
+                            <span class="text-koreanRed font-black whitespace-nowrap">NT$ 200</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">搭配燒烤與炸雞的絕佳微醺良伴。</p>
+                        <button onclick="addToCart('真露韓式燒酒', 200)" class="mt-2 text-xs bg-red-50 text-koreanRed px-3 py-2 rounded-lg font-bold hover:bg-koreanRed hover:text-white transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入點餐
+                        </button>
+                    </div>
+                </div>
+
+                <div class="menu-item bg-white p-4 sm:p-5 rounded-2xl shadow-sm flex items-center space-x-4 border border-gray-100 group" data-category="drink">
+                    <div class="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                        <div class="food-img" style="--c1:#fef08a; --c2:#fde047; --fs:2.6rem;" role="img" aria-label="香蕉牛奶"><span>🍌</span></div>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start gap-2">
+                            <h4 class="font-bold text-gray-900">經典香蕉牛奶</h4>
+                            <span class="text-koreanRed font-black whitespace-nowrap">NT$ 80</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">濃郁香甜的韓國國民飲品。</p>
+                        <button onclick="addToCart('經典香蕉牛奶', 80)" class="mt-2 text-xs bg-red-50 text-koreanRed px-3 py-2 rounded-lg font-bold hover:bg-koreanRed hover:text-white transition-colors">
+                            <i class="fa-solid fa-plus mr-1"></i> 加入點餐
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 關於我們 (About Section) -->
+    <section id="about" class="py-16 sm:py-20 bg-white safe-x">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+                <div class="space-y-6">
+                    <span class="text-koreanRed font-bold text-sm tracking-widest uppercase">About Us</span>
+                    <h2 class="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">堅持正宗首爾味道，傳遞溫暖人情味</h2>
+                    <p class="text-gray-600 leading-relaxed">
+                        「韓味屋」創立於 2018 年，主廚遠赴首爾拜師學藝，將最道地的韓式醬料與烹調技術帶回台灣。我們堅持每日手作韓式小菜，嚴選高品質肉品與食材，只為了讓每位顧客踏進店裡，就能感受到宛如置身韓國街頭食堂的溫馨與美味。
+                    </p>
+                    <div class="grid grid-cols-2 gap-6 pt-4">
+                        <div class="border-l-4 border-koreanRed pl-4">
+                            <span class="block text-3xl font-black text-gray-900">100%</span>
+                            <span class="text-gray-500 text-sm">正宗韓國進口醬料</span>
+                        </div>
+                        <div class="border-l-4 border-koreanGold pl-4">
+                            <span class="block text-3xl font-black text-gray-900">4.9★</span>
+                            <span class="text-gray-500 text-sm">Google 饕客真實好評</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <div class="rounded-2xl shadow-xl w-full h-64 sm:h-80 lg:h-[450px] overflow-hidden">
+                        <div class="food-img" style="--c1:#7f1d1d; --c2:#1f2937; --fs:7rem;" role="img" aria-label="餐廳環境"><span>🏮</span></div>
+                    </div>
+                    <div class="mt-4 sm:mt-0 sm:absolute sm:-bottom-6 sm:-left-6 bg-koreanDark text-white p-5 sm:p-6 rounded-2xl shadow-xl">
+                        <p class="font-bold text-lg">營業時間</p>
+                        <p class="text-gray-300 text-sm mt-1">週一至週日 11:30 - 22:00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 線上訂位 (Reservation Section) -->
+    <section id="reservation" class="py-16 sm:py-20 bg-gray-900 text-white relative safe-x">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center max-w-3xl mx-auto mb-10 sm:mb-16">
+                <span class="text-koreanGold font-bold text-sm tracking-widest uppercase">Table Reservation</span>
+                <h2 class="text-3xl sm:text-4xl font-black mt-2">線上預約訂位</h2>
+                <div class="w-16 h-1 bg-koreanGold mx-auto mt-4 rounded-full"></div>
+                <p class="text-gray-400 mt-4">填寫下方表單立即預約用餐座位，我們將盡快與您確認。</p>
+            </div>
+
+            <div class="max-w-3xl mx-auto bg-gray-800 p-5 sm:p-10 rounded-3xl shadow-2xl border border-gray-700">
+                <form id="reservation-form" onsubmit="handleReservation(event)" class="space-y-5 sm:space-y-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
+                        <div>
+                            <label for="res-name" class="block text-sm font-medium text-gray-300 mb-2">您的姓名</label>
+                            <input type="text" id="res-name" required autocomplete="name" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-koreanRed transition-colors" placeholder="請輸入姓名">
+                        </div>
+                        <div>
+                            <label for="res-phone" class="block text-sm font-medium text-gray-300 mb-2">聯絡電話</label>
+                            <input type="tel" id="res-phone" required autocomplete="tel" inputmode="tel" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-koreanRed transition-colors" placeholder="0912-345-678">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6">
+                        <div>
+                            <label for="res-date" class="block text-sm font-medium text-gray-300 mb-2">用餐日期</label>
+                            <input type="date" id="res-date" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-koreanRed transition-colors">
+                        </div>
+                        <div>
+                            <label for="res-time" class="block text-sm font-medium text-gray-300 mb-2">用餐時段</label>
+                            <select id="res-time" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-koreanRed transition-colors">
+                                <option>11:30 / 12:30 / 13:30</option>
+                                <option>17:30 / 18:30 / 19:30 / 20:30</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="res-people" class="block text-sm font-medium text-gray-300 mb-2">用餐人數</label>
+                            <select id="res-people" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-koreanRed transition-colors">
+                                <option>1 位貴賓</option>
+                                <option>2 位貴賓</option>
+                                <option>3-4 位貴賓</option>
+                                <option>5-8 位貴賓 (包廂)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="res-note" class="block text-sm font-medium text-gray-300 mb-2">備註事項 (選填)</label>
+                        <textarea id="res-note" rows="3" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-koreanRed transition-colors" placeholder="如有兒童座椅需求或過敏原請在此告知..."></textarea>
+                    </div>
+                    <button type="submit" class="w-full py-4 bg-koreanRed hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition-all">
+                        確認送出預約
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- 頁尾 (Footer) -->
+    <footer class="bg-gray-950 text-gray-400 py-12 border-t border-gray-900 safe-x safe-bottom">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-6 md:space-y-0 text-center md:text-left">
+                <div class="flex items-center space-x-2">
+                    <div class="bg-koreanRed text-white p-2 rounded-lg">
+                        <i class="fa-solid fa-bowl-food"></i>
+                    </div>
+                    <span class="text-xl font-bold text-white tracking-wider">韓味屋</span>
+                </div>
+                <div class="text-sm">
+                    <p>地址：台北市大安區忠孝東路四段 88 號 1 樓</p>
+                    <p class="mt-1">電話：<a href="tel:+886223456789" class="hover:text-white">(02) 2345-6789</a> | Email：<a href="mailto:service@hanmeiwu.com" class="hover:text-white">service@hanmeiwu.com</a></p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" aria-label="Facebook" class="w-11 h-11 rounded-full bg-gray-900 flex items-center justify-center hover:bg-koreanRed hover:text-white transition-colors"><i class="fa-brands fa-facebook-f"></i></a>
+                    <a href="#" aria-label="Instagram" class="w-11 h-11 rounded-full bg-gray-900 flex items-center justify-center hover:bg-koreanRed hover:text-white transition-colors"><i class="fa-brands fa-instagram"></i></a>
+                    <a href="#" aria-label="LINE" class="w-11 h-11 rounded-full bg-gray-900 flex items-center justify-center hover:bg-koreanRed hover:text-white transition-colors"><i class="fa-brands fa-line"></i></a>
+                </div>
+            </div>
+            <div class="mt-8 pt-8 border-t border-gray-900 text-center text-xs text-gray-600">
+                &copy; 2026 韓味屋 Han Mei Wu. All Rights Reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- 購物車抽屜 (Cart Drawer) -->
+    <div id="cart-drawer" class="fixed inset-0 z-[55] overflow-hidden hidden" aria-hidden="true">
+        <div id="cart-overlay" class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="toggleCart()"></div>
+        <div id="cart-panel" class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl flex flex-col safe-top">
+            <div class="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fa-solid fa-cart-shopping mr-2 text-koreanRed"></i> 我的點餐清單
+                </h3>
+                <button onclick="toggleCart()" aria-label="關閉" class="w-10 h-10 text-gray-400 hover:text-gray-600 rounded-full">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4" id="cart-items-container"></div>
+
+            <div class="p-5 sm:p-6 border-t border-gray-100 bg-gray-50 space-y-4 safe-bottom">
+                <div class="flex justify-between text-base font-bold text-gray-900">
+                    <span>總計金額</span>
+                    <span id="cart-total" class="text-koreanRed">NT$ 0</span>
+                </div>
+                <button onclick="checkout()" class="w-full py-3.5 bg-koreanRed hover:bg-red-700 text-white font-bold rounded-xl shadow-md transition-all">
+                    確認送出訂單
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知彈窗 -->
+    <div id="custom-modal" class="fixed inset-0 z-[70] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl relative z-10 text-center space-y-4">
+            <div id="modal-icon" class="w-12 h-12 rounded-full bg-red-100 text-koreanRed flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h4 id="modal-title" class="text-lg font-bold text-gray-900">提示訊息</h4>
+            <p id="modal-message" class="text-gray-600 text-sm">內容文字...</p>
+            <button onclick="closeModal()" class="w-full py-2.5 bg-gray-900 hover:bg-koreanRed text-white font-medium rounded-xl transition-colors">
+                確定
+            </button>
+        </div>
+    </div>
+
+    <!-- 底部 Toast（加入購物車、PWA 更新等） -->
+    <div id="toast-wrap" class="fixed left-0 right-0 bottom-4 z-[65] flex flex-col items-center gap-2 px-4 pointer-events-none safe-bottom"></div>
+
+    <script>
+        /* =========================
+         * 購物車（localStorage 持久化）
+         * ========================= */
+        const CART_KEY = 'hanmeiwu_cart_v1';
+        let cart = [];
+
+        function loadCart() {
+            try { cart = JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch (e) { cart = []; }
+        }
+        function saveCart() {
+            try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {}
+        }
+
+        function escapeHTML(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        /* ---- 導覽 / 抽屜 ---- */
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        function toggleCart() {
+            const drawer = document.getElementById('cart-drawer');
+            if (drawer.classList.contains('hidden')) {
+                drawer.classList.remove('hidden');
+                drawer.setAttribute('aria-hidden', 'false');
+                requestAnimationFrame(() => drawer.classList.add('open'));
+                document.body.style.overflow = 'hidden';
+            } else {
+                drawer.classList.remove('open');
+                drawer.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+                setTimeout(() => drawer.classList.add('hidden'), 300);
+            }
+        }
+
+        /* ---- 購物車操作 ---- */
+        function addToCart(name, price) {
+            const existing = cart.find(i => i.name === name);
+            if (existing) existing.quantity += 1;
+            else cart.push({ name, price, quantity: 1 });
+            saveCart();
+            updateCartUI();
+            showToast(`已加入「${name}」`);
+        }
+
+        function changeQuantity(index, delta) {
+            cart[index].quantity += delta;
+            if (cart[index].quantity <= 0) cart.splice(index, 1);
+            saveCart();
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const container = document.getElementById('cart-items-container');
+            const badge = document.getElementById('cart-badge');
+            const totalEl = document.getElementById('cart-total');
+
+            const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
+            badge.textContent = totalItems;
+            badge.classList.toggle('hidden', totalItems === 0);
+
+            if (cart.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center py-12">您的點餐清單目前是空的</p>';
+                totalEl.textContent = 'NT$ 0';
+                return;
+            }
+
+            let total = 0;
+            container.innerHTML = '';
+            cart.forEach((item, index) => {
+                total += item.price * item.quantity;
+                const row = document.createElement('div');
+                row.className = 'flex justify-between items-center gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm';
+                row.innerHTML = `
+                    <div class="min-w-0">
+                        <h5 class="font-bold text-gray-900 text-sm truncate">${escapeHTML(item.name)}</h5>
+                        <p class="text-xs text-gray-500">NT$ ${item.price} × ${item.quantity}</p>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0">
+                        <button onclick="changeQuantity(${index}, -1)" aria-label="減少" class="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold">-</button>
+                        <span class="text-sm font-bold w-5 text-center">${item.quantity}</span>
+                        <button onclick="changeQuantity(${index}, 1)" aria-label="增加" class="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-sm font-bold">+</button>
+                    </div>`;
+                container.appendChild(row);
+            });
+            totalEl.textContent = `NT$ ${total}`;
+        }
+
+        function checkout() {
+            if (cart.length === 0) {
+                showNotification('提醒', '您的點餐清單是空的，請先選擇餐點！', 'warning');
+                return;
+            }
+            toggleCart();
+            showNotification('訂單送出成功！', '感謝您的光臨，餐點正在為您準備中！', 'success');
+            cart = [];
+            saveCart();
+            updateCartUI();
+        }
+
+        /* ---- 菜單分類 ---- */
+        function filterMenu(event, category) {
+            document.querySelectorAll('.menu-tab-btn').forEach(tab => {
+                tab.classList.remove('bg-koreanRed', 'text-white', 'shadow-md');
+                tab.classList.add('bg-white', 'text-gray-700');
+            });
+            const btn = event.currentTarget;
+            btn.classList.remove('bg-white', 'text-gray-700');
+            btn.classList.add('bg-koreanRed', 'text-white', 'shadow-md');
+
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.style.display = (category === 'all' || item.dataset.category === category) ? 'flex' : 'none';
+            });
+        }
+
+        /* ---- 訂位 ---- */
+        function initReservationDate() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            document.getElementById('res-date').min = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
+
+        function handleReservation(event) {
+            event.preventDefault();
+            const name = document.getElementById('res-name').value;
+            const date = document.getElementById('res-date').value;
+            const time = document.getElementById('res-time').value;
+            showNotification('預約成功！', `感謝 ${name} 先生/小姐，已成功預約 ${date} ${time} 的座位，我們將發送簡訊確認。`, 'success');
+            document.getElementById('reservation-form').reset();
+        }
+
+        /* ---- 彈窗 / Toast ---- */
+        function showNotification(title, message, type) {
+            const iconEl = document.getElementById('modal-icon');
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            if (type === 'success') {
+                iconEl.className = 'w-12 h-12 rounded-full bg-red-100 text-koreanRed flex items-center justify-center mx-auto text-xl';
+                iconEl.innerHTML = '<i class="fa-solid fa-check"></i>';
+            } else {
+                iconEl.className = 'w-12 h-12 rounded-full bg-amber-100 text-koreanGold flex items-center justify-center mx-auto text-xl';
+                iconEl.innerHTML = '<i class="fa-solid fa-exclamation"></i>';
+            }
+            document.getElementById('custom-modal').classList.remove('hidden');
+        }
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        function showToast(text, opts = {}) {
+            const wrap = document.getElementById('toast-wrap');
+            const el = document.createElement('div');
+            el.className = 'toast pointer-events-auto bg-gray-900 text-white text-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-sm';
+            el.innerHTML = `<i class="fa-solid fa-circle-check text-koreanGold"></i><span>${escapeHTML(text)}</span>`;
+            if (opts.action) {
+                const b = document.createElement('button');
+                b.className = 'ml-2 font-bold text-koreanGold underline';
+                b.textContent = opts.action.label;
+                b.onclick = opts.action.onClick;
+                el.appendChild(b);
+            }
+            wrap.appendChild(el);
+            setTimeout(() => el.remove(), opts.duration || 2000);
+        }
+
+        /* =========================
+         * PWA：安裝 / 離線 / Service Worker
+         * ========================= */
+        let deferredPrompt = null;
+        const installBtn = document.getElementById('install-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.classList.remove('hidden');
+            installBtn.classList.add('inline-flex');
+        });
+
+        async function installApp() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            installBtn.classList.add('hidden');
+            installBtn.classList.remove('inline-flex');
+        }
+
+        window.addEventListener('appinstalled', () => {
+            installBtn.classList.add('hidden');
+            showToast('韓味屋已安裝到您的裝置！');
+        });
+
+        // iOS Safari 沒有 beforeinstallprompt：提供加入主畫面提示
+        (function iosHint() {
+            const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            const standalone = window.navigator.standalone === true;
+            if (isIOS && !standalone && !localStorage.getItem('ios_hint_shown')) {
+                setTimeout(() => {
+                    showToast('點 Safari「分享」→「加入主畫面」即可安裝', { duration: 6000 });
+                    try { localStorage.setItem('ios_hint_shown', '1'); } catch (e) {}
+                }, 2500);
+            }
+        })();
+
+        // 離線 / 上線狀態
+        function updateOnlineStatus() {
+            document.getElementById('offline-bar').classList.toggle('hidden', navigator.onLine);
+        }
+        window.addEventListener('online', () => { updateOnlineStatus(); showToast('已恢復連線'); });
+        window.addEventListener('offline', updateOnlineStatus);
+
+        // 註冊 Service Worker（需 https 或 localhost）
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then((reg) => {
+                    reg.addEventListener('updatefound', () => {
+                        const nw = reg.installing;
+                        if (!nw) return;
+                        nw.addEventListener('statechange', () => {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                showToast('有新版本可用', {
+                                    duration: 10000,
+                                    action: { label: '立即更新', onClick: () => nw.postMessage('SKIP_WAITING') }
+                                });
+                            }
+                        });
+                    });
+                }).catch((err) => console.warn('SW 註冊失敗：', err));
+
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    location.reload();
+                });
+            });
+        }
+
+        /* ---- 初始化 ---- */
+        loadCart();
+        updateCartUI();
+        initReservationDate();
+        updateOnlineStatus();
+    </script>
+</body>
+</html>
